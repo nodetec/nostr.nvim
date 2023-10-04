@@ -1,8 +1,8 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
-const LOG_PATH = path.join(os.homedir(), '.local', 'state', 'nostr.log');
+const LOG_PATH = path.join(os.homedir(), ".local", "state", "nostr.log");
 
 function log(msg) {
   const timestamp = new Date().toISOString();
