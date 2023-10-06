@@ -93,14 +93,14 @@ async function publish(event, plugin) {
   await connectedRelay.connect();
   await connectedRelay.publish(event);
   logger.log("published event: " + JSON.stringify(event));
-
-  // async function onOk() {
-  //   plugin.nvim.command('lua vim.notify("Note published", "info")');
-  // }
-  //
-  // async function onFailed() {
-  //   plugin.nvim.command('lua vim.notify("Failed to publish note", "error")');
-  // }
+  let publishedEvent = await connectedRelay.get({
+    ids: [event.id],
+  });
+  if (publishedEvent) {
+    plugin.nvim.command('lua vim.notify("Note published", "info")');
+    return;
+  }
+  plugin.nvim.command('lua vim.notify("Failed to publish note", "error")');
 }
 
 module.exports = {
