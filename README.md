@@ -1,23 +1,34 @@
 # nostr.nvim
 
-## Install & Configure
+## Install (Lazy)
 
 ```lua
 local M = {
-  url = "git@github.com:ChristianChiarulli/nostr.nvim.git",
+  "ChristianChiarulli/nostr.nvim",
   dependencies = {
     "MunifTanjim/nui.nvim",
   },
-  build = ":UpdateRemotePlugins",
+  build ={ "cd rplugin/node/nostr && npm i",  ":UpdateRemotePlugins", }
 }
 
 function M.config()
   require("nostr").setup {}
-
-  vim.api.nvim_set_keymap("n", "<c-n>", '<cmd>lua require("nostr").read_from_relay()<cr>', { noremap = true })
 end
 
 return M
+```
+
+## Functions
+
+```lua
+require("nostr").generate_keys()
+require("nostr").add_relay()
+require("nostr").remove_relay("wss://relay.damus.io")
+require("nostr").list_relays()
+require("nostr").set_active_relay()
+require("nostr").publish_note()
+require("nostr").decode()
+require("nostr").encode()
 ```
 
 ## Neovim Node Client
