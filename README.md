@@ -23,7 +23,7 @@ return M
 ```lua
 require("nostr").generate_keys()
 require("nostr").add_relay()
-require("nostr").remove_relay("wss://relay.damus.io")
+require("nostr").remove_relay()
 require("nostr").list_relays()
 require("nostr").set_active_relay()
 require("nostr").publish_note()
