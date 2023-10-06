@@ -31,9 +31,22 @@ function M.list_relays()
 	vim.notify("relays listed!")
 end
 
-function M.set_active_relay(url)
-	vim.fn["NostrSetActiveRelay"](url)
-	vim.notify(url .. "set active!")
+-- TODO: multiple active relays for reading and posting
+function M.set_active_relay()
+	local relays = vim.fn["NostrListRelays"]()
+
+	vim.ui.select(relays, {
+		prompt = "Set Active Relay:",
+		-- TODO: check if active relay is set and mark it
+		-- format_item = function(item)
+		-- 	return ("%s: %s"):format(item, vals[item])
+		-- end,
+	}, function(choice)
+		if choice then
+			vim.fn["NostrSetActiveRelay"](choice)
+			vim.notify(choice .. "set active!")
+		end
+	end)
 end
 
 function M.publish_note()
@@ -41,11 +54,20 @@ function M.publish_note()
 end
 
 function M.encode()
-	ui.input(vim.fn["NostrPublishNote"], "Encode: ")
+	vim.ui.select({ "npub", "nsec" }, {
+		prompt = "Set Active Relay:",
+	}, function(choice)
+		if choice == "npub" then
+			ui.input(vim.fn["NostrNpubEncode"], "Encode: ")
+		end
+		if choice == "nsec" then
+			ui.input(vim.fn["NostrNsecEncode"], "Encode: ")
+		end
+	end)
 end
 
 function M.decode()
-	ui.input(vim.fn["NostrPublishNote"], "Decode: ")
+	ui.input(vim.fn["NostrDecode"], "Decode: ")
 end
 
 -- function M.show_notes(eventsStr)

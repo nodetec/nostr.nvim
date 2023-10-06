@@ -97,7 +97,7 @@ async function publish(event, plugin) {
     ids: [event.id],
   });
   if (publishedEvent) {
-    plugin.nvim.command('lua vim.notify("Note published", "info")');
+    plugin.nvim.command(`lua vim.notify("Note published to ${connectedRelay.url}", "info")`);
     return;
   }
   plugin.nvim.command('lua vim.notify("Failed to publish note", "error")');

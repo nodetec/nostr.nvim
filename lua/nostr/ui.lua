@@ -1,6 +1,6 @@
 local M = {}
 
-function M.input(action, prompt)
+function M.input(action, prompt, args)
 	local Input = require("nui.input")
 	local event = require("nui.utils.autocmd").event
 
@@ -23,8 +23,11 @@ function M.input(action, prompt)
 		prompt = "> ",
 		default_value = "",
 		on_submit = function(value)
-			-- vim.fn["NostrPublishNote"](value)
-      action(value)
+			if args then
+				action(value, args)
+			else
+				action(value)
+			end
 		end,
 	})
 
