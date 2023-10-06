@@ -14,7 +14,7 @@ const RELAYS_PATH = path.join(
 );
 
 let relays = loadRelays();
-let activeRelay = relays.active || null;
+let activeRelay = relays.active || "wss://relay.damus.io";
 let connectedRelay = null;
 
 function loadRelays() {
@@ -41,13 +41,13 @@ function addRelay(url, plugin) {
 }
 
 function removeRelay(url) {
-  relays.relays = relays.relays.filter((relay) => relay !== url);
+  relays.relays = relays.relays.filter((relay) => relay !== url[0]);
   fs.writeFileSync(RELAYS_PATH, JSON.stringify(relays, null, 2));
 }
 
 function listRelays(plugin) {
   logger.log("Listing relays" + JSON.stringify(relays.relays));
-  plugin.nvim.outWrite(JSON.stringify(relays) + "\n");
+  // plugin.nvim.outWrite(JSON.stringify(relays) + "\n");
   return relays.relays;
 }
 
@@ -82,25 +82,25 @@ async function setActiveRelay(url, plugin) {
   plugin.nvim.command('lua vim.notify("Relay set", "info")');
 }
 
-async function publish(relays, event, onOk, onFailed) {
-  logger.log("publishing to relays:", relays);
-  for (const url of relays) {
-    const relay = await connectedRelay.getState().connect(url);
-
-    if (!relay) return;
-
-    let pub = relay.publish(event);
-
-    pub.on("ok", () => {
-      logger.log(`${url} has accepted our event`);
-      onOk();
-    });
-
-    pub.on("failed", (reason) => {
-      logger.log(`failed to publish to ${url}: ${reason}`);
-      onFailed();
-    });
+async function publish(event, plugin) {
+  if (connectedRelay === null) {
+    plugin.nvim.command(
+      `lua vim.notify("Connecting to ${activeRelay}", "info")`,
+    );
+    connectedRelay = nostr.relayInit(activeRelay);
   }
+  logger.log("publishing event: " + JSON.stringify(event));
+  await connectedRelay.connect();
+  await connectedRelay.publish(event);
+  logger.log("published event: " + JSON.stringify(event));
+
+  // async function onOk() {
+  //   plugin.nvim.command('lua vim.notify("Note published", "info")');
+  // }
+  //
+  // async function onFailed() {
+  //   plugin.nvim.command('lua vim.notify("Failed to publish note", "error")');
+  // }
 }
 
 module.exports = {
@@ -110,4 +110,5 @@ module.exports = {
   setActiveRelay,
   activeRelay,
   connect,
+  publish,
 };

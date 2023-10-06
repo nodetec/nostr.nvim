@@ -1,5 +1,8 @@
 const keys = require("./lib/keys");
 const relayManager = require("./lib/relayManager");
+const events = require("./lib/events");
+require("websocket-polyfill");
+const logger = require("./lib/logger");
 
 module.exports = (plugin) => {
   plugin.setOptions({ dev: true });
@@ -33,13 +36,23 @@ module.exports = (plugin) => {
     async () => {
       return relayManager.listRelays(plugin);
     },
-    { sync: false },
+    { sync: true },
   );
 
   plugin.registerFunction(
     "NostrSetActiveRelay",
     async (url) => {
       await relayManager.setActiveRelay(url, plugin);
+    },
+    { sync: false },
+  );
+
+  plugin.registerFunction(
+    "NostrPublishNote",
+    async (message) => {
+      const event = events.create(1, [], message[0]);
+      logger.log("publishing event: " + JSON.stringify(event));
+      await relayManager.publish(event, plugin);
     },
     { sync: false },
   );

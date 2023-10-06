@@ -19,3 +19,12 @@ end
 
 return M
 ```
+
+## Neovim Node Client
+
+https://github.com/neovim/node-client
+
+## Check if functions are registered
+
+remote/host: node host registered plugins ['nostr']
+remote/host: generated rplugin manifest: /Users/cam/.local/share/nvim/rplugin.vim
