@@ -39,3 +39,12 @@ https://github.com/neovim/node-client
 
 remote/host: node host registered plugins ['nostr']
 remote/host: generated rplugin manifest: /Users/cam/.local/share/nvim/rplugin.vim
+
+## TODO
+
+- [ ] private DMs
+- [ ] collaborative editing
+- [ ] note feed
+- [ ] note tags
+- [ ] note search
+
