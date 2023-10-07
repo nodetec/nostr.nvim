@@ -1,4 +1,8 @@
 local ui = require("nostr.ui")
+local blog = require("nostr.blog")
+local bounty = require("nostr.bounty")
+local snippet = require("nostr.snippet")
+local note = require("nostr.note")
 
 local M = {}
 
@@ -50,7 +54,19 @@ function M.set_active_relay()
 end
 
 function M.publish_note()
-	ui.input(vim.fn["NostrPublishNote"], "Enter note: ")
+  note.post()
+end
+
+function M.publish_blog()
+	blog.post()
+end
+
+function M.publish_bounty()
+	bounty.post()
+end
+
+function M.publish_snippet()
+	snippet.post()
 end
 
 function M.encode()

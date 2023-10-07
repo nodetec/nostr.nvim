@@ -83,6 +83,7 @@ async function setActiveRelay(url, plugin) {
 }
 
 async function publish(event, plugin) {
+  logger.log("testing")
   if (connectedRelay === null) {
     plugin.nvim.command(
       `lua vim.notify("Connecting to ${activeRelay}", "info")`,

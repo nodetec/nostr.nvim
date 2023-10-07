@@ -1,7 +1,9 @@
 const nostr = require("nostr-tools");
 const keys = require("./keys");
 
-function create(kind, tags, content) {
+const logger = require("./logger");
+
+function create(kind, content, tags) {
   const keypair = keys.getKeyPair();
 
   const publicKey = keypair.publicKey;
@@ -14,6 +16,8 @@ function create(kind, tags, content) {
     content: content,
     pubkey: publicKey,
   };
+
+  logger.log("event: " + JSON.stringify(event));
 
   event.id = nostr.getEventHash(event);
   event.sig = nostr.getSignature(event, privateKey);

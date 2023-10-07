@@ -3,10 +3,20 @@ const logger = require("./logger");
 
 function decode(input, plugin) {
   logger.log("Decoding: " + input);
-  const { type, data } = nostr.nip19.decode(input);
+  let { type, data } = nostr.nip19.decode(input);
   logger.log("Decoded: " + JSON.stringify({ type, data }));
+
+  if (type === "naddr" || type === "nevent" || type === "nprofile") {
+    data = JSON.stringify(data);
+  }
+
+  // replace all double quotes with single quotes
+  data = data.replace(/"/g, '\\"');
+
   plugin.nvim.command(`let @+ = "${data}"`);
+  logger.log("COPIED");
   plugin.nvim.command(`lua vim.notify("${data} copied to clipboard!", "info")`);
+  logger.log("DECODED: " + data);
   return data;
 }
 

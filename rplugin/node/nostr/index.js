@@ -4,6 +4,7 @@ const events = require("./lib/events");
 const nip19 = require("./lib/nip19");
 require("websocket-polyfill");
 const logger = require("./lib/logger");
+const utils = require("./lib/utils");
 
 module.exports = (plugin) => {
   plugin.setOptions({ dev: true });
@@ -50,8 +51,8 @@ module.exports = (plugin) => {
 
   plugin.registerFunction(
     "NostrPublishNote",
-    async (message) => {
-      const event = events.create(1, [], message[0]);
+    async (args) => {
+      const event = events.create(args[0], args[1], args[2]);
       logger.log("publishing event: " + JSON.stringify(event));
       await relayManager.publish(event, plugin);
     },
@@ -80,5 +81,26 @@ module.exports = (plugin) => {
       return nip19.nsecEncode(input[0], plugin);
     },
     { sync: true },
+  );
+
+  plugin.registerFunction(
+    "NostrPublishReplaceableParameterizedNote",
+    async (args) => {
+      logger.log("publishing replaceable parameterized note");
+
+      const title = utils.findFirstH1Header(args[1]);
+      const uniqueUrl = utils.createUniqueUrl(title);
+      const content = utils.removeFirstH1Header(args[1]);
+      const initialTags = args[2]
+      const additionaltags = [
+        ["d", uniqueUrl],
+        ["title", title],
+        ["published_at", Math.floor(Date.now() / 1000) + ""],
+      ];
+      const tags = initialTags.concat(additionaltags);
+      const event = events.create(30023, content, tags);
+      await relayManager.publish(event, plugin);
+    },
+    { sync: false },
   );
 };
