@@ -98,7 +98,8 @@ module.exports = (plugin) => {
         ["published_at", Math.floor(Date.now() / 1000) + ""],
       ];
       const tags = initialTags.concat(additionaltags);
-      const event = events.create(30023, content, tags);
+      const event = events.create(args[0], content, tags);
+      logger.log("publishing event: " + JSON.stringify(event));
       await relayManager.publish(event, plugin);
     },
     { sync: false },

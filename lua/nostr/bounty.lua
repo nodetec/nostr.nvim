@@ -38,7 +38,7 @@ function M.post()
 		prompt = "> ",
 		default_value = "",
 		on_submit = function(summary)
-			popup_options.border.text.top = "Enter image URL"
+			popup_options.border.text.top = "Enter value (in Sats)"
 			local value_input = Input(popup_options, {
 				prompt = "> ",
 				default_value = "",
@@ -50,7 +50,7 @@ function M.post()
 							vim.fn["NostrPublishReplaceableParameterizedNote"](
 								30050,
 								buffer_content,
-								{ { "summary", summary }, { "value", value } }
+								{ { "summary", summary }, { "value", value }, {"status", "open"} }
 							)
 						end
 					end)
