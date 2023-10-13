@@ -51,7 +51,7 @@ function M.post()
 							vim.fn["NostrPublishReplaceableParameterizedNote"](
 								30023,
 								buffer_content,
-								{ { "summary", summary }, { "image", image_url } }
+								{ { "summary", summary }, { "image", image_url }, { "t", "neovim" } }
 							)
 						end
 					end)
