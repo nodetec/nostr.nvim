@@ -1,0 +1,26 @@
+{
+  "name": "nostr.nvim",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "rplugin/node/nostr/index.js",
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "fs-extra": "^11.2.0",
+    "neovim": "^5.1.0",
+    "nostr-tools": "^2.7.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/eslint": "^8.56.10",
+    "@types/node": "^20.14.10",
+    "@types/ws": "^8.5.10",
+    "eslint": "^9.6.0",
+    "prettier": "^3.3.2",
+    "tsup": "^8.1.0",
+    "typescript": "^5.5.3"
+  }
+}
