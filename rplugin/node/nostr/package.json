@@ -1,15 +1,15 @@
 {
-  "name": "nostr",
-  "version": "1.0.0",
-  "description": "An example node plugin",
+  "name": "nostr.nvim",
+  "version": "0.0.1",
+  "description": "A node plugin for Neovim.",
   "main": "index.js",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/neovim/node-client.git"
+    "url": "https://nodetec.com/nostr.nvim.git"
   },
   "dependencies": {
-    "nostr-tools": "^1.16.0",
-    "websocket-polyfill": "^0.0.3"
+    "nostr-tools": "^2.7.0",
+    "websocket-polyfill": "^1.0.0"
   }
 }
