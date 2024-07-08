@@ -33,60 +33,112 @@ __export(src_exports, {
   default: () => src_default
 });
 module.exports = __toCommonJS(src_exports);
-var import_nostr_tools = require("nostr-tools");
 var import_pool = require("nostr-tools/pool");
 var import_ws = __toESM(require("ws"));
+
+// src/lib/config.ts
+var fs = __toESM(require("fs-extra"));
+var path = __toESM(require("path"));
+var import_nostr_tools = require("nostr-tools");
+var configDir = path.join(process.env.HOME || "", ".config", "nostr.nvim");
+var configFile = path.join(configDir, "config.json");
+async function generateConfig() {
+  if (!await fs.pathExists(configFile)) {
+    const secretKey = (0, import_nostr_tools.generateSecretKey)();
+    const publicKey = (0, import_nostr_tools.getPublicKey)(secretKey);
+    const defaultConfig = {
+      nsec: import_nostr_tools.nip19.nsecEncode(secretKey),
+      npub: import_nostr_tools.nip19.npubEncode(publicKey),
+      readRelays: ["wss://relay.damus.io"],
+      writeRelays: ["wss://relay.damus.io"]
+    };
+    await fs.ensureDir(configDir);
+    await fs.writeJson(configFile, defaultConfig, { spaces: 2 });
+  }
+  const config = await fs.readJson(configFile);
+  console.log(JSON.stringify(config, null, 2));
+  return config;
+}
+async function getConfig() {
+  try {
+    const config = await fs.readJson(configFile);
+    return config;
+  } catch (err) {
+    return void 0;
+  }
+}
+async function getSecretKeyUint8Arr() {
+  const config = await getConfig();
+  if (!config) {
+    return void 0;
+  }
+  const secretKey = import_nostr_tools.nip19.decode(config.nsec).data;
+  if (!secretKey) {
+    return void 0;
+  }
+  return secretKey;
+}
+async function getWriteRelays() {
+  const config = await getConfig();
+  if (!config) {
+    return void 0;
+  }
+  return config.writeRelays;
+}
+
+// src/lib/note.ts
+var import_nostr_tools2 = require("nostr-tools");
+async function sendNote(plugin2, pool2, content, tags = [], notify = true) {
+  const secretKey = await getSecretKeyUint8Arr();
+  if (!secretKey) {
+    return;
+  }
+  const writeRelays = await getWriteRelays();
+  if (!writeRelays) {
+    return;
+  }
+  let event = (0, import_nostr_tools2.finalizeEvent)(
+    {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1e3),
+      tags,
+      content
+    },
+    secretKey
+  );
+  await Promise.any(pool2.publish(writeRelays, event));
+  if (notify) {
+    plugin2.nvim.command(
+      `lua vim.notify('Published note: ${event.content}', 'info')`
+    );
+  }
+}
+
+// src/index.ts
 (0, import_pool.useWebSocketImplementation)(import_ws.default);
-var plugin = (nvim) => {
-  nvim.setOptions({ dev: true });
-  nvim.registerCommand("SendMessage", async () => {
-    const npub = "npub105p3vlhq8kvmk99f0e8dpsa95haqthvjdfxemrj3fv64226rx44q2t0kr4";
-    const nsec = "nsec1vdux8mkv4qrpz2epj2qmgmwytd5lw6mp59hsqlwycuyus64cvzwqn7gmgk";
-    const sk = import_nostr_tools.nip19.decode(nsec).data;
-    const pk = import_nostr_tools.nip19.decode(npub).data;
-    let event = (0, import_nostr_tools.finalizeEvent)(
-      {
-        kind: 1,
-        created_at: Math.floor(Date.now() / 1e3),
-        tags: [],
-        content: "hello from neovim! 2"
-      },
-      sk
-    );
-    let isGood = (0, import_nostr_tools.verifyEvent)(event);
-    console.log(`isGood: ${isGood}`);
-    console.log(`event: ${event.content}`);
-    console.log(`pk: ${import_nostr_tools.nip19.npubEncode(pk)}`);
-    console.log(`sk: ${import_nostr_tools.nip19.nsecEncode(sk)}`);
-    const pool = new import_pool.SimplePool();
-    let relays = ["wss://relay.damus.io"];
-    await Promise.any(pool.publish(relays, event));
-    nvim.nvim.command(
-      `lua vim.notify("Published note: ${event.content}", "info")`
-    );
+var pool = new import_pool.SimplePool();
+var plugin = (plugin2) => {
+  plugin2.setOptions({ dev: true });
+  plugin2.registerFunction("NostrGenerateConfig", async () => {
+    generateConfig();
   });
-  nvim.registerCommand("ListenForNotes", async () => {
-    const npub = "npub105p3vlhq8kvmk99f0e8dpsa95haqthvjdfxemrj3fv64226rx44q2t0kr4";
-    const pool = new import_pool.SimplePool();
-    let relays = ["wss://relay.damus.io"];
-    const pk = import_nostr_tools.nip19.decode(npub).data;
-    let h = pool.subscribeMany(
-      relays,
-      [
-        {
-          authors: [pk]
-        }
-      ],
-      {
-        onevent(event) {
-          nvim.nvim.command(
-            `lua vim.notify("Recived note: ${event.content}", "info")`
-          );
-        },
-        oneose() {
-        }
-      }
-    );
+  plugin2.registerCommand("NostrGenerateConfig", async () => {
+    generateConfig();
+  });
+  plugin2.registerFunction("NostrSendNote", async (content) => {
+    sendNote(plugin2, pool, content);
+  });
+  plugin2.registerCommand(
+    "NostrSendNote",
+    async (args) => {
+      sendNote(plugin2, pool, args[0]);
+    },
+    {
+      sync: false,
+      nargs: "*"
+    }
+  );
+  plugin2.registerCommand("ListenForNotes", async () => {
   });
 };
 var src_default = plugin;

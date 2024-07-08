@@ -1,90 +1,39 @@
-import { NvimPlugin, Neovim } from "neovim";
-import {
-  // generateSecretKey,
-  // getPublicKey,
-  finalizeEvent,
-  verifyEvent,
-  nip19,
-} from "nostr-tools";
+import { NvimPlugin } from "neovim";
 import { SimplePool, useWebSocketImplementation } from "nostr-tools/pool";
 import WebSocket from "ws";
+import { generateConfig } from "./lib/config";
+import { sendNote } from "./lib/note";
 useWebSocketImplementation(WebSocket);
 
-const plugin = (nvim: NvimPlugin) => {
-  nvim.setOptions({ dev: true });
-  nvim.registerCommand("SendMessage", async () => {
-    // let sk = generateSecretKey();
-    // let pk = getPublicKey(sk);
+const pool = new SimplePool();
 
-    const npub =
-      "npub105p3vlhq8kvmk99f0e8dpsa95haqthvjdfxemrj3fv64226rx44q2t0kr4";
-    const nsec =
-      "nsec1vdux8mkv4qrpz2epj2qmgmwytd5lw6mp59hsqlwycuyus64cvzwqn7gmgk";
+const plugin = (plugin: NvimPlugin) => {
+  plugin.setOptions({ dev: true });
 
-    const sk = nip19.decode(nsec).data;
-    const pk = nip19.decode(npub).data;
-
-    let event = finalizeEvent(
-      {
-        kind: 1,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [],
-        content: "hello from neovim! 2",
-      },
-      sk,
-    );
-
-    let isGood = verifyEvent(event);
-
-    console.log(`isGood: ${isGood}`);
-    console.log(`event: ${event.content}`);
-
-    console.log(`pk: ${nip19.npubEncode(pk)}`);
-    console.log(`sk: ${nip19.nsecEncode(sk)}`);
-
-    const pool = new SimplePool();
-
-    let relays = ["wss://relay.damus.io"];
-
-    await Promise.any(pool.publish(relays, event));
-
-    nvim.nvim.command(
-      `lua vim.notify("Published note: ${event.content}", "info")`,
-    );
-
-    // Neovim.EventEmitter.em
+  plugin.registerFunction("NostrGenerateConfig", async () => {
+    generateConfig();
   });
 
-  nvim.registerCommand("ListenForNotes", async () => {
-    const npub =
-      "npub105p3vlhq8kvmk99f0e8dpsa95haqthvjdfxemrj3fv64226rx44q2t0kr4";
-    const pool = new SimplePool();
-
-    let relays = ["wss://relay.damus.io"];
-
-    const pk = nip19.decode(npub).data;
-
-    let h = pool.subscribeMany(
-      relays,
-      [
-        {
-          authors: [pk],
-        },
-      ],
-      {
-        onevent(event) {
-          // this will only be called once the first time the event is received
-          // ...
-          nvim.nvim.command(
-            `lua vim.notify("Recived note: ${event.content}", "info")`,
-          );
-        },
-        oneose() {
-          // h.close();
-        },
-      },
-    );
+  plugin.registerCommand("NostrGenerateConfig", async () => {
+    generateConfig();
   });
+
+  plugin.registerFunction("NostrSendNote", async (content: string) => {
+    sendNote(plugin, pool, content);
+  });
+
+  plugin.registerCommand(
+    "NostrSendNote",
+    async (args: any) => {
+      sendNote(plugin, pool, args[0]);
+    },
+    {
+      sync: false,
+      nargs: "*",
+    },
+  );
+
+  plugin.registerCommand("ListenForNotes", async () => {});
 };
 
 export default plugin;
