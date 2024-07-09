@@ -33,5 +33,5 @@ This will create a config file at `~/.local/share/nostr.nvim/config.json` where 
 ## Post a note to nostr
 
 ```
-:NostrSendNote "Hello Nostr from Neovim!"
+:NostrSendNote Hello Nostr from Neovim!
 ```
