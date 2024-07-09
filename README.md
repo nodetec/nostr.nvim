@@ -39,3 +39,11 @@ This will create a config file at `~/.local/share/nostr.nvim/config.json` where 
 ```
 :NostrSendNote Hello Nostr from Neovim!
 ```
+
+## Troubleshooting
+
+If you're having issues with the commands not being available try running:
+
+```
+:UpdateRemotePlugins
+```
