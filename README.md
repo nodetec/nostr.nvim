@@ -2,6 +2,10 @@
 
 ## Install
 
+```bash
+npm i -g neovim # this package is required
+```
+
 Lazy spec:
 
 ```lua
