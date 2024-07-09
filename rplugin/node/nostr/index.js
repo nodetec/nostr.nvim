@@ -135,7 +135,7 @@ var plugin = (plugin2) => {
     },
     {
       sync: false,
-      nargs: "*"
+      nargs: "1"
     }
   );
   plugin2.registerCommand("ListenForNotes", async () => {

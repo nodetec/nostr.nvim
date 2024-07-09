@@ -29,7 +29,7 @@ const plugin = (plugin: NvimPlugin) => {
     },
     {
       sync: false,
-      nargs: "*",
+      nargs: "1",
     },
   );
 
