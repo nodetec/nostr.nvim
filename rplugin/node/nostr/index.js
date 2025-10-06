@@ -228,6 +228,84 @@ var init_message = __esm({
   }
 });
 
+// src/lib/note.ts
+var note_exports = {};
+__export(note_exports, {
+  formatTimestamp: () => formatTimestamp2,
+  getNotesForPubkey: () => getNotesForPubkey,
+  parsePubkey: () => parsePubkey,
+  postNote: () => postNote
+});
+async function postNote(privateKeyHex, content, relays) {
+  const pool = new import_pool2.SimplePool();
+  try {
+    const privateKey = hexToBytes(privateKeyHex);
+    const event = (0, import_pure3.finalizeEvent)(
+      {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1e3),
+        tags: [],
+        content
+      },
+      privateKey
+    );
+    await Promise.any(pool.publish(relays, event));
+    return event.id;
+  } finally {
+    pool.close(relays);
+  }
+}
+async function getNotesForPubkey(pubkey, relays, limit = 20) {
+  const pool = new import_pool2.SimplePool();
+  const notes = [];
+  try {
+    const events = await pool.querySync(relays, {
+      kinds: [1],
+      authors: [pubkey],
+      limit
+    });
+    for (const event of events) {
+      notes.push({
+        id: event.id,
+        pubkey: event.pubkey,
+        content: event.content,
+        created_at: event.created_at
+      });
+    }
+    notes.sort((a, b) => b.created_at - a.created_at);
+    return notes;
+  } finally {
+    pool.close(relays);
+  }
+}
+function parsePubkey(input) {
+  if (input.startsWith("npub")) {
+    const decoded = (0, import_nip193.decode)(input);
+    if (decoded.type === "npub") {
+      return decoded.data;
+    }
+    throw new Error("Invalid npub");
+  }
+  if (!/^[0-9a-f]{64}$/i.test(input)) {
+    throw new Error("Invalid public key format. Use npub or hex.");
+  }
+  return input.toLowerCase();
+}
+function formatTimestamp2(timestamp) {
+  const date = new Date(timestamp * 1e3);
+  return date.toLocaleString();
+}
+var import_pool2, import_pure3, import_nip193;
+var init_note = __esm({
+  "src/lib/note.ts"() {
+    "use strict";
+    import_pool2 = require("nostr-tools/pool");
+    import_pure3 = require("nostr-tools/pure");
+    init_utils();
+    import_nip193 = require("nostr-tools/nip19");
+  }
+});
+
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
@@ -389,9 +467,11 @@ Hex: ${keys.publicKey}
           );
           return;
         }
-        const { getKeysFromHex: getKeysFromHex2 } = await Promise.resolve().then(() => (init_keys(), keys_exports));
-        const keys = getKeysFromHex2(config.publicKey);
-        await plugin.nvim.outWrite(`${keys.npub}
+        const { npubEncode: npubEncode2 } = await import("nostr-tools/nip19");
+        const npub = npubEncode2(config.publicKey);
+        await plugin.nvim.call("setreg", ["+", npub]);
+        await plugin.nvim.outWrite(`${npub}
+(Copied to clipboard)
 `);
       } catch (error) {
         await plugin.nvim.errWrite(`Error getting npub: ${error}
@@ -483,9 +563,9 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        const { receiveMessages: receiveMessages2, formatTimestamp: formatTimestamp2 } = await Promise.resolve().then(() => (init_message(), message_exports));
+        const { receiveMessages: receiveMessages2, formatTimestamp: formatTimestamp3 } = await Promise.resolve().then(() => (init_message(), message_exports));
         const { npubEncode: npubEncode2 } = await import("nostr-tools/nip19");
-        await plugin.nvim.outWrite("Fetching messages from relays...\n\n");
+        await plugin.nvim.outWrite("Fetching messages from relays...\n");
         const messages = await receiveMessages2(
           config.privateKey,
           config.relays,
@@ -495,27 +575,191 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           await plugin.nvim.outWrite("No messages found.\n");
           return;
         }
-        await plugin.nvim.outWrite(`Found ${messages.length} message(s):
-
-`);
+        const lines = [
+          `Nostr Direct Messages (${messages.length} message${messages.length > 1 ? "s" : ""})`,
+          "=".repeat(80),
+          ""
+        ];
         for (const msg of messages) {
           const fromNpub = npubEncode2(msg.from);
-          const timestamp = formatTimestamp2(msg.created_at);
-          await plugin.nvim.outWrite(
-            `From: ${fromNpub}
-Time: ${timestamp}
-Message: ${msg.content}
-${"=".repeat(60)}
-
-`
-          );
+          const timestamp = formatTimestamp3(msg.created_at);
+          lines.push(`From: ${fromNpub}`);
+          lines.push(`Time: ${timestamp}`);
+          lines.push("");
+          const contentLines = msg.content.split("\n");
+          lines.push(...contentLines);
+          lines.push("");
+          lines.push("-".repeat(80));
+          lines.push("");
         }
+        lines.push("");
+        lines.push("Press q to close");
+        const buf = await plugin.nvim.createBuffer(false, true);
+        await buf.setLines(lines, { start: 0, end: -1, strictIndexing: false });
+        await buf.setOption("modifiable", false);
+        await buf.setOption("buftype", "nofile");
+        await buf.setOption("bufhidden", "wipe");
+        await buf.setOption("filetype", "nostr-messages");
+        const width = await plugin.nvim.getOption("columns");
+        const height = await plugin.nvim.getOption("lines");
+        const winWidth = Math.floor(width * 0.8);
+        const winHeight = Math.floor(height * 0.8);
+        const row = Math.floor((height - winHeight) / 2);
+        const col = Math.floor((width - winWidth) / 2);
+        const win = await plugin.nvim.openWindow(buf, true, {
+          relative: "editor",
+          width: winWidth,
+          height: winHeight,
+          row,
+          col,
+          style: "minimal",
+          border: "rounded"
+        });
+        await win.setOption("wrap", true);
+        await win.setOption("cursorline", true);
+        await plugin.nvim.command(
+          `autocmd BufLeave <buffer=${buf.id}> ++once lua vim.api.nvim_win_close(${win.id}, true)`
+        );
+        await buf.setKeymap("n", "q", ":close<CR>", {
+          noremap: true,
+          silent: true
+        });
       } catch (error) {
         await plugin.nvim.errWrite(`Error checking messages: ${error}
 `);
       }
     },
     { sync: false }
+  );
+  plugin.registerCommand(
+    "NostrPostNote",
+    async (args) => {
+      try {
+        if (args.length === 0) {
+          await plugin.nvim.errWrite(
+            "Usage: :NostrPostNote <message>\nExample: :NostrPostNote Hello Nostr from Neovim!\n"
+          );
+          return;
+        }
+        const config = await loadConfig();
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n"
+          );
+          return;
+        }
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+          );
+          return;
+        }
+        const { postNote: postNote2 } = await Promise.resolve().then(() => (init_note(), note_exports));
+        const content = args.join(" ");
+        await plugin.nvim.outWrite("Publishing note to Nostr...\n");
+        const eventId = await postNote2(
+          config.privateKey,
+          content,
+          config.relays
+        );
+        await plugin.nvim.outWrite(
+          `Note published successfully!
+Event ID: ${eventId}
+`
+        );
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error posting note: ${error}
+`);
+      }
+    },
+    { sync: false, nargs: "*" }
+  );
+  plugin.registerCommand(
+    "NostrGetNotes",
+    async (args) => {
+      try {
+        if (args.length === 0) {
+          await plugin.nvim.errWrite(
+            "Usage: :NostrGetNotes <npub/hex>\nExample: :NostrGetNotes npub1...\n"
+          );
+          return;
+        }
+        const config = await loadConfig();
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+          );
+          return;
+        }
+        const { getNotesForPubkey: getNotesForPubkey2, parsePubkey: parsePubkey2, formatTimestamp: formatTimestamp3 } = await Promise.resolve().then(() => (init_note(), note_exports));
+        const { npubEncode: npubEncode2 } = await import("nostr-tools/nip19");
+        const pubkeyInput = args[0];
+        const pubkey = parsePubkey2(pubkeyInput);
+        await plugin.nvim.outWrite("Fetching notes from relays...\n");
+        const notes = await getNotesForPubkey2(
+          pubkey,
+          config.relays,
+          20
+        );
+        if (notes.length === 0) {
+          await plugin.nvim.outWrite("No notes found for this user.\n");
+          return;
+        }
+        const npub = npubEncode2(pubkey);
+        const lines = [
+          `Notes from ${npub}`,
+          "=".repeat(80),
+          `${notes.length} note${notes.length > 1 ? "s" : ""}`,
+          ""
+        ];
+        for (const note of notes) {
+          const timestamp = formatTimestamp3(note.created_at);
+          lines.push(`Posted: ${timestamp}`);
+          lines.push("");
+          const contentLines = note.content.split("\n");
+          lines.push(...contentLines);
+          lines.push("");
+          lines.push("-".repeat(80));
+          lines.push("");
+        }
+        lines.push("");
+        lines.push("Press q to close");
+        const buf = await plugin.nvim.createBuffer(false, true);
+        await buf.setLines(lines, { start: 0, end: -1, strictIndexing: false });
+        await buf.setOption("modifiable", false);
+        await buf.setOption("buftype", "nofile");
+        await buf.setOption("bufhidden", "wipe");
+        await buf.setOption("filetype", "nostr-notes");
+        const width = await plugin.nvim.getOption("columns");
+        const height = await plugin.nvim.getOption("lines");
+        const winWidth = Math.floor(width * 0.8);
+        const winHeight = Math.floor(height * 0.8);
+        const row = Math.floor((height - winHeight) / 2);
+        const col = Math.floor((width - winWidth) / 2);
+        const win = await plugin.nvim.openWindow(buf, true, {
+          relative: "editor",
+          width: winWidth,
+          height: winHeight,
+          row,
+          col,
+          style: "minimal",
+          border: "rounded"
+        });
+        await win.setOption("wrap", true);
+        await win.setOption("cursorline", true);
+        await plugin.nvim.command(
+          `autocmd BufLeave <buffer=${buf.id}> ++once lua vim.api.nvim_win_close(${win.id}, true)`
+        );
+        await buf.setKeymap("n", "q", ":close<CR>", {
+          noremap: true,
+          silent: true
+        });
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error getting notes: ${error}
+`);
+      }
+    },
+    { sync: false, nargs: "*" }
   );
 }
 /*! Bundled license information:

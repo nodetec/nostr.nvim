@@ -48,4 +48,22 @@ function M.check_dms()
   vim.cmd('NostrCheckDMs')
 end
 
+-- Post a public note (kind 1)
+function M.post_note(message)
+  if message then
+    vim.cmd('NostrPostNote ' .. message)
+  else
+    vim.cmd('NostrPostNote')
+  end
+end
+
+-- Get notes for an npub
+function M.get_notes(npub)
+  if npub then
+    vim.cmd('NostrGetNotes ' .. npub)
+  else
+    vim.cmd('NostrGetNotes')
+  end
+end
+
 return M
