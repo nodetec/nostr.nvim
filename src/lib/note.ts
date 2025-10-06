@@ -32,8 +32,16 @@ export async function postNote(
       privateKey
     );
 
-    // Publish to relays
-    await Promise.any(pool.publish(relays, event));
+    // Publish to all relays
+    const results = await Promise.allSettled(pool.publish(relays, event));
+
+    // Check if at least one relay succeeded
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    if (succeeded === 0) {
+      throw new Error(`Failed to publish to all ${relays.length} relay(s)`);
+    }
 
     return event.id;
   } finally {

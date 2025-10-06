@@ -36,7 +36,13 @@ export async function sendMessage(
 
     // Publish all wrapped events to relays
     for (const event of wrappedEvents) {
-      await Promise.any(pool.publish(relays, event));
+      const results = await Promise.allSettled(pool.publish(relays, event));
+
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+
+      if (succeeded === 0) {
+        throw new Error(`Failed to publish message to all ${relays.length} relay(s)`);
+      }
     }
   } finally {
     pool.close(relays);

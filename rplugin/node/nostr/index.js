@@ -217,7 +217,7 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        const { parseRecipient, sendMessage } = await import("./message-WKAD3XEA.js");
+        const { parseRecipient, sendMessage } = await import("./message-XZ5XYPE2.js");
         const recipientInput = args[0];
         const message = args.slice(1).join(" ");
         const recipientPubkey = parseRecipient(recipientInput);
@@ -253,7 +253,7 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        const { receiveMessages, formatTimestamp } = await import("./message-WKAD3XEA.js");
+        const { receiveMessages, formatTimestamp } = await import("./message-XZ5XYPE2.js");
         const { npubEncode } = await import("nostr-tools/nip19");
         await plugin.nvim.outWrite("Fetching messages from relays...\n");
         const messages = await receiveMessages(
@@ -356,7 +356,7 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        const { postNote } = await import("./note-WYUG6FIQ.js");
+        const { postNote } = await import("./note-4MVTJQXZ.js");
         const content = args.join(" ");
         await plugin.nvim.outWrite("Publishing note to Nostr...\n");
         const eventId = await postNote(
@@ -407,7 +407,7 @@ Event ID: ${eventId}
           await plugin.nvim.outWrite("Post cancelled.\n");
           return;
         }
-        const { postNote } = await import("./note-WYUG6FIQ.js");
+        const { postNote } = await import("./note-4MVTJQXZ.js");
         await plugin.nvim.outWrite("\nPublishing note to Nostr...\n");
         const eventId = await postNote(
           config.privateKey,
@@ -459,7 +459,7 @@ Event ID: ${eventId}
           postSnippet,
           getFileExtension,
           detectLanguageFromExtension
-        } = await import("./snippet-672P4RIS.js");
+        } = await import("./snippet-5RGWI2IP.js");
         let language = filetype || void 0;
         let extension;
         let name;
@@ -533,7 +533,7 @@ Event ID: ${eventId}
           );
           return;
         }
-        const { getNotesForPubkey, parsePubkey, formatTimestamp } = await import("./note-WYUG6FIQ.js");
+        const { getNotesForPubkey, parsePubkey, formatTimestamp } = await import("./note-4MVTJQXZ.js");
         const { npubEncode } = await import("nostr-tools/nip19");
         const pubkeyInput = args[0];
         const pubkey = parsePubkey(pubkeyInput);
