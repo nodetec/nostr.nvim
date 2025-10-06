@@ -453,6 +453,111 @@ export default function (plugin: NvimPlugin) {
   );
 
   plugin.registerCommand(
+    "NostrPostSnippet",
+    async () => {
+      try {
+        const config = await loadConfig();
+
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n",
+          );
+          return;
+        }
+
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+          );
+          return;
+        }
+
+        // Get current buffer content
+        const buffer = await plugin.nvim.buffer;
+        const lines = await buffer.lines;
+        const content = lines.join("\n");
+
+        if (content.trim() === "") {
+          await plugin.nvim.errWrite("Buffer is empty. Nothing to post.\n");
+          return;
+        }
+
+        // Get buffer info
+        const bufferName = (await buffer.name) as string;
+        const filetype = (await plugin.nvim.call("getbufvar", [
+          buffer.id,
+          "&filetype",
+        ])) as string;
+
+        const {
+          postSnippet,
+          getFileExtension,
+          detectLanguageFromExtension,
+        } = await import("./lib/snippet.js");
+
+        // Determine language and extension
+        let language = filetype || undefined;
+        let extension: string | undefined;
+        let name: string | undefined;
+
+        if (bufferName) {
+          // Extract filename from full path
+          const filename = bufferName.split("/").pop() || bufferName;
+          name = filename;
+          extension = getFileExtension(filename);
+
+          // If we have extension but no filetype, detect language
+          if (extension && !language) {
+            language = detectLanguageFromExtension(extension);
+          }
+        }
+
+        // Prompt for description
+        const description = (await plugin.nvim.call("input", [
+          "Description (optional): ",
+        ])) as string;
+
+        // Show confirmation with snippet details
+        let confirmMsg = `Post code snippet to Nostr (NIP-C0)?\n`;
+        if (name) confirmMsg += `Name: ${name}\n`;
+        if (language) confirmMsg += `Language: ${language}\n`;
+        if (extension) confirmMsg += `Extension: ${extension}\n`;
+        if (description) confirmMsg += `Description: ${description}\n`;
+        confirmMsg += `Lines: ${lines.length}\n`;
+        confirmMsg += `Confirm (y/n): `;
+
+        const confirmation = await plugin.nvim.call("input", [confirmMsg]);
+
+        if (confirmation !== "y" && confirmation !== "Y") {
+          await plugin.nvim.outWrite("Post cancelled.\n");
+          return;
+        }
+
+        await plugin.nvim.outWrite("\nPublishing code snippet to Nostr...\n");
+
+        const eventId = await postSnippet(
+          config.privateKey,
+          content,
+          {
+            language,
+            name,
+            extension,
+            description: description || undefined,
+          },
+          config.relays,
+        );
+
+        await plugin.nvim.outWrite(
+          `Code snippet published successfully!\n` + `Event ID: ${eventId}\n`,
+        );
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error posting snippet: ${error}\n`);
+      }
+    },
+    { sync: false },
+  );
+
+  plugin.registerCommand(
     "NostrGetNotes",
     async (args: string[]) => {
       try {

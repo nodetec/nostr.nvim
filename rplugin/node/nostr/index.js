@@ -427,6 +427,96 @@ Event ID: ${eventId}
     { sync: false }
   );
   plugin.registerCommand(
+    "NostrPostSnippet",
+    async () => {
+      try {
+        const config = await loadConfig();
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n"
+          );
+          return;
+        }
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+          );
+          return;
+        }
+        const buffer = await plugin.nvim.buffer;
+        const lines = await buffer.lines;
+        const content = lines.join("\n");
+        if (content.trim() === "") {
+          await plugin.nvim.errWrite("Buffer is empty. Nothing to post.\n");
+          return;
+        }
+        const bufferName = await buffer.name;
+        const filetype = await plugin.nvim.call("getbufvar", [
+          buffer.id,
+          "&filetype"
+        ]);
+        const {
+          postSnippet,
+          getFileExtension,
+          detectLanguageFromExtension
+        } = await import("./snippet-672P4RIS.js");
+        let language = filetype || void 0;
+        let extension;
+        let name;
+        if (bufferName) {
+          const filename = bufferName.split("/").pop() || bufferName;
+          name = filename;
+          extension = getFileExtension(filename);
+          if (extension && !language) {
+            language = detectLanguageFromExtension(extension);
+          }
+        }
+        const description = await plugin.nvim.call("input", [
+          "Description (optional): "
+        ]);
+        let confirmMsg = `Post code snippet to Nostr (NIP-C0)?
+`;
+        if (name) confirmMsg += `Name: ${name}
+`;
+        if (language) confirmMsg += `Language: ${language}
+`;
+        if (extension) confirmMsg += `Extension: ${extension}
+`;
+        if (description) confirmMsg += `Description: ${description}
+`;
+        confirmMsg += `Lines: ${lines.length}
+`;
+        confirmMsg += `Confirm (y/n): `;
+        const confirmation = await plugin.nvim.call("input", [confirmMsg]);
+        if (confirmation !== "y" && confirmation !== "Y") {
+          await plugin.nvim.outWrite("Post cancelled.\n");
+          return;
+        }
+        await plugin.nvim.outWrite("\nPublishing code snippet to Nostr...\n");
+        const eventId = await postSnippet(
+          config.privateKey,
+          content,
+          {
+            language,
+            name,
+            extension,
+            description: description || void 0
+          },
+          config.relays
+        );
+        await plugin.nvim.outWrite(
+          `Code snippet published successfully!
+Event ID: ${eventId}
+`
+        );
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error posting snippet: ${error}
+`);
+      }
+    },
+    { sync: false }
+  );
+  plugin.registerCommand(
     "NostrGetNotes",
     async (args) => {
       try {
