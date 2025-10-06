@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A Neovim plugin that brings [Nostr](https://nostr.com) (Notes and Other Stuff Transmitted by Relays) to your editor.",
   "main": "rplugin/node/nostr/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsup",
     "update": "npx npm-check-updates -i"
