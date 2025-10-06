@@ -558,6 +558,307 @@ export default function (plugin: NvimPlugin) {
   );
 
   plugin.registerCommand(
+    "NostrPostLongform",
+    async () => {
+      try {
+        const config = await loadConfig();
+
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n",
+          );
+          return;
+        }
+
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+          );
+          return;
+        }
+
+        // Get current buffer content
+        const buffer = await plugin.nvim.buffer;
+        const lines = await buffer.lines;
+        const content = lines.join("\n");
+
+        if (content.trim() === "") {
+          await plugin.nvim.errWrite("Buffer is empty. Nothing to post.\n");
+          return;
+        }
+
+        const {
+          postLongform,
+          extractFrontmatter,
+          extractTitleFromMarkdown,
+          generateIdentifier,
+        } = await import("./lib/longform.js");
+
+        // Extract frontmatter if present
+        const { frontmatter, markdown: markdownWithPossibleTitle } =
+          extractFrontmatter(content);
+
+        // Extract title from markdown if present
+        const { title: markdownTitle, content: markdownContent } =
+          extractTitleFromMarkdown(markdownWithPossibleTitle);
+
+        // Get title (from frontmatter, markdown header, or prompt)
+        let title = frontmatter.title as string | undefined;
+        if (!title && markdownTitle) {
+          title = markdownTitle;
+        }
+
+        if (!title) {
+          title = (await plugin.nvim.call("input", [
+            "Article title: ",
+          ])) as string;
+
+          if (!title || title.trim() === "") {
+            await plugin.nvim.errWrite(
+              "Title is required for long-form content.\n",
+            );
+            return;
+          }
+        }
+
+        // Use the content with title stripped if it was extracted
+        const finalMarkdown = markdownTitle ? markdownContent : markdownWithPossibleTitle;
+
+        // Get summary (from frontmatter or prompt)
+        let summary = frontmatter.summary as string | undefined;
+        if (!summary) {
+          summary = (await plugin.nvim.call("input", [
+            "Summary (optional): ",
+          ])) as string;
+        }
+
+        // Get topics (from frontmatter or prompt)
+        let topics = frontmatter.tags || frontmatter.topics;
+        if (!topics) {
+          const topicsInput = (await plugin.nvim.call("input", [
+            "Topics (comma-separated, optional): ",
+          ])) as string;
+
+          if (topicsInput && topicsInput.trim() !== "") {
+            topics = topicsInput.split(",").map((t) => t.trim());
+          }
+        }
+
+        // Generate identifier
+        const identifier =
+          frontmatter.identifier ||
+          frontmatter.id ||
+          generateIdentifier(title);
+
+        // Get image URL if present
+        const image = frontmatter.image as string | undefined;
+
+        // Show confirmation
+        let confirmMsg = `Post long-form article to Nostr (NIP-23)?\n`;
+        confirmMsg += `Title: ${title}\n`;
+        if (summary) confirmMsg += `Summary: ${summary}\n`;
+        if (image) confirmMsg += `Image: ${image}\n`;
+        if (topics && topics.length > 0)
+          confirmMsg += `Topics: ${topics.join(", ")}\n`;
+        confirmMsg += `Identifier: ${identifier}\n`;
+        confirmMsg += `Words: ${finalMarkdown.split(/\s+/).length}\n`;
+        confirmMsg += `Confirm (y/n): `;
+
+        const confirmation = await plugin.nvim.call("input", [confirmMsg]);
+
+        if (confirmation !== "y" && confirmation !== "Y") {
+          await plugin.nvim.outWrite("Post cancelled.\n");
+          return;
+        }
+
+        await plugin.nvim.outWrite(
+          "\nPublishing long-form article to Nostr...\n",
+        );
+
+        const eventId = await postLongform(
+          config.privateKey,
+          finalMarkdown,
+          {
+            identifier,
+            title,
+            summary: summary || undefined,
+            image,
+            topics,
+          },
+          config.relays,
+        );
+
+        await plugin.nvim.outWrite(
+          `Article published successfully!\n` + `Event ID: ${eventId}\n`,
+        );
+
+        // Update frontmatter with identifier if needed
+        const bufferName = (await buffer.name) as string;
+        if (bufferName) {
+          // Check if we need to update the frontmatter
+          const needsUpdate =
+            Object.keys(frontmatter).length === 0 ||
+            !frontmatter.identifier ||
+            frontmatter.identifier !== identifier;
+
+          if (needsUpdate) {
+            const currentLines = await buffer.lines;
+            const currentContent = currentLines.join("\n");
+            const { frontmatter: currentFm, markdown: currentMd } =
+              extractFrontmatter(currentContent);
+
+            let newContent: string;
+
+            if (Object.keys(currentFm).length > 0) {
+              // Update existing frontmatter
+              const fmLines = ["---"];
+
+              // Always include identifier first if we have one
+              if (identifier) {
+                fmLines.push(`identifier: ${identifier}`);
+              }
+
+              // Add other fields from existing frontmatter
+              for (const [key, value] of Object.entries(currentFm)) {
+                if (key === 'identifier') continue; // Skip, already added
+                if (Array.isArray(value)) {
+                  fmLines.push(`${key}: ${value.join(", ")}`);
+                } else {
+                  fmLines.push(`${key}: ${value}`);
+                }
+              }
+
+              fmLines.push("---", "");
+              newContent = fmLines.join("\n") + currentMd;
+            } else {
+              // Add new frontmatter
+              const fmLines = [
+                "---",
+                `identifier: ${identifier}`,
+                `title: ${title}`,
+                "---",
+                "",
+              ];
+              newContent = fmLines.join("\n") + currentContent;
+            }
+
+            // Update buffer
+            const newLines = newContent.split("\n");
+            await buffer.setLines(newLines, {
+              start: 0,
+              end: -1,
+              strictIndexing: false,
+            });
+
+            // Save buffer
+            await plugin.nvim.command("write");
+            await plugin.nvim.outWrite(
+              "Frontmatter updated with identifier and file saved.\n",
+            );
+          }
+        }
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error posting article: ${error}\n`);
+      }
+    },
+    { sync: false },
+  );
+
+  plugin.registerCommand(
+    "NostrAddFrontmatter",
+    async () => {
+      try {
+        const buffer = await plugin.nvim.buffer;
+        const lines = await buffer.lines;
+        const content = lines.join("\n");
+
+        if (content.trim() === "") {
+          await plugin.nvim.errWrite("Buffer is empty.\n");
+          return;
+        }
+
+        const { extractFrontmatter, extractTitleFromMarkdown } = await import(
+          "./lib/longform.js"
+        );
+
+        // Check if frontmatter already exists
+        const { frontmatter } = extractFrontmatter(content);
+        if (Object.keys(frontmatter).length > 0) {
+          await plugin.nvim.errWrite(
+            "Buffer already has frontmatter. Remove it first if you want to recreate it.\n",
+          );
+          return;
+        }
+
+        // Extract title from markdown if present
+        const { title: markdownTitle } = extractTitleFromMarkdown(content);
+
+        // Prompt for metadata
+        const title = (await plugin.nvim.call("input", [
+          `Title${markdownTitle ? ` [${markdownTitle}]` : ""}: `,
+        ])) as string;
+
+        const finalTitle = title.trim() || markdownTitle;
+
+        if (!finalTitle) {
+          await plugin.nvim.errWrite("Title is required.\n");
+          return;
+        }
+
+        const identifier = (await plugin.nvim.call("input", [
+          "Identifier (optional, auto-generated if empty): ",
+        ])) as string;
+
+        const summary = (await plugin.nvim.call("input", [
+          "Summary (optional): ",
+        ])) as string;
+
+        const image = (await plugin.nvim.call("input", [
+          "Image URL (optional): ",
+        ])) as string;
+
+        const topicsInput = (await plugin.nvim.call("input", [
+          "Topics/tags (comma-separated, optional): ",
+        ])) as string;
+
+        // Build frontmatter
+        const frontmatterLines = ["---", `title: ${finalTitle}`];
+
+        if (identifier && identifier.trim() !== "") {
+          frontmatterLines.push(`identifier: ${identifier.trim()}`);
+        }
+
+        if (summary && summary.trim() !== "") {
+          frontmatterLines.push(`summary: ${summary.trim()}`);
+        }
+
+        if (image && image.trim() !== "") {
+          frontmatterLines.push(`image: ${image.trim()}`);
+        }
+
+        if (topicsInput && topicsInput.trim() !== "") {
+          const topics = topicsInput.split(",").map((t) => t.trim());
+          frontmatterLines.push(`tags: ${topics.join(", ")}`);
+        }
+
+        frontmatterLines.push("---", "");
+
+        // Insert frontmatter at the beginning of the buffer
+        await buffer.setLines(frontmatterLines, {
+          start: 0,
+          end: 0,
+          strictIndexing: false,
+        });
+
+        await plugin.nvim.outWrite("Frontmatter added successfully!\n");
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error adding frontmatter: ${error}\n`);
+      }
+    },
+    { sync: false },
+  );
+
+  plugin.registerCommand(
     "NostrGetNotes",
     async (args: string[]) => {
       try {
