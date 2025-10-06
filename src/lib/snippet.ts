@@ -77,7 +77,7 @@ export async function postSnippet(
 
     // Check if at least one relay succeeded
     const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
+    // const failed = results.filter(r => r.status === 'rejected').length;
 
     if (succeeded === 0) {
       throw new Error(`Failed to publish to all ${relays.length} relay(s)`);
