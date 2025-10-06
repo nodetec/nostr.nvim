@@ -141,6 +141,93 @@ var init_keys = __esm({
   }
 });
 
+// src/lib/message.ts
+var message_exports = {};
+__export(message_exports, {
+  formatTimestamp: () => formatTimestamp,
+  parseRecipient: () => parseRecipient,
+  receiveMessages: () => receiveMessages,
+  sendMessage: () => sendMessage
+});
+async function sendMessage(privateKeyHex, recipientPubkey, message, relays) {
+  const pool = new import_pool.SimplePool();
+  try {
+    const privateKey = hexToBytes(privateKeyHex);
+    const senderPubkey = (0, import_pure2.getPublicKey)(privateKey);
+    const wrappedEvents = nip17.wrapManyEvents(
+      privateKey,
+      [
+        { publicKey: recipientPubkey },
+        { publicKey: senderPubkey }
+      ],
+      message
+    );
+    for (const event of wrappedEvents) {
+      await Promise.any(pool.publish(relays, event));
+    }
+  } finally {
+    pool.close(relays);
+  }
+}
+async function receiveMessages(privateKeyHex, relays, limit = 20) {
+  const pool = new import_pool.SimplePool();
+  const messages = [];
+  try {
+    const privateKey = hexToBytes(privateKeyHex);
+    const publicKey = (0, import_pure2.getPublicKey)(privateKey);
+    const events = await pool.querySync(relays, {
+      kinds: [1059],
+      "#p": [publicKey],
+      limit
+    });
+    for (const event of events) {
+      try {
+        const rumor = nip17.unwrapEvent(event, privateKey);
+        messages.push({
+          id: rumor.id,
+          from: rumor.pubkey,
+          content: rumor.content,
+          created_at: rumor.created_at
+        });
+      } catch (error) {
+        continue;
+      }
+    }
+    messages.sort((a, b) => b.created_at - a.created_at);
+    return messages;
+  } finally {
+    pool.close(relays);
+  }
+}
+function parseRecipient(input) {
+  if (input.startsWith("npub")) {
+    const decoded = (0, import_nip192.decode)(input);
+    if (decoded.type === "npub") {
+      return decoded.data;
+    }
+    throw new Error("Invalid npub");
+  }
+  if (!/^[0-9a-f]{64}$/i.test(input)) {
+    throw new Error("Invalid public key format. Use npub or hex.");
+  }
+  return input.toLowerCase();
+}
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp * 1e3);
+  return date.toLocaleString();
+}
+var import_pool, nip17, import_nip192, import_pure2;
+var init_message = __esm({
+  "src/lib/message.ts"() {
+    "use strict";
+    import_pool = require("nostr-tools/pool");
+    nip17 = __toESM(require("nostr-tools/nip17"));
+    init_utils();
+    import_nip192 = require("nostr-tools/nip19");
+    import_pure2 = require("nostr-tools/pure");
+  }
+});
+
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
@@ -292,6 +379,28 @@ Hex: ${keys.publicKey}
     { sync: false }
   );
   plugin.registerCommand(
+    "NostrGetNpub",
+    async () => {
+      try {
+        const config = await loadConfig();
+        if (!config.publicKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Generate keys with :NostrGenerateKeys or import with :NostrImportKey\n"
+          );
+          return;
+        }
+        const { getKeysFromHex: getKeysFromHex2 } = await Promise.resolve().then(() => (init_keys(), keys_exports));
+        const keys = getKeysFromHex2(config.publicKey);
+        await plugin.nvim.outWrite(`${keys.npub}
+`);
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error getting npub: ${error}
+`);
+      }
+    },
+    { sync: false }
+  );
+  plugin.registerCommand(
     "NostrSetupRelay",
     async () => {
       try {
@@ -310,6 +419,99 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
         );
       } catch (error) {
         await plugin.nvim.errWrite(`Error setting up relay: ${error}
+`);
+      }
+    },
+    { sync: false }
+  );
+  plugin.registerCommand(
+    "NostrSendDM",
+    async (args) => {
+      try {
+        if (args.length < 2) {
+          await plugin.nvim.errWrite(
+            "Usage: :NostrSendDM <npub/hex> <message>\nExample: :NostrSendDM npub1... Hello from Neovim!\n"
+          );
+          return;
+        }
+        const config = await loadConfig();
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n"
+          );
+          return;
+        }
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+          );
+          return;
+        }
+        const { parseRecipient: parseRecipient2, sendMessage: sendMessage2 } = await Promise.resolve().then(() => (init_message(), message_exports));
+        const recipientInput = args[0];
+        const message = args.slice(1).join(" ");
+        const recipientPubkey = parseRecipient2(recipientInput);
+        await plugin.nvim.outWrite("Sending encrypted message...\n");
+        await sendMessage2(
+          config.privateKey,
+          recipientPubkey,
+          message,
+          config.relays
+        );
+        await plugin.nvim.outWrite("Message sent successfully!\n");
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error sending message: ${error}
+`);
+      }
+    },
+    { sync: false, nargs: "*" }
+  );
+  plugin.registerCommand(
+    "NostrCheckDMs",
+    async () => {
+      try {
+        const config = await loadConfig();
+        if (!config.privateKey) {
+          await plugin.nvim.errWrite(
+            "No keys found. Run :NostrInit or :NostrGenerateKeys first.\n"
+          );
+          return;
+        }
+        if (!config.relays || config.relays.length === 0) {
+          await plugin.nvim.errWrite(
+            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+          );
+          return;
+        }
+        const { receiveMessages: receiveMessages2, formatTimestamp: formatTimestamp2 } = await Promise.resolve().then(() => (init_message(), message_exports));
+        const { npubEncode: npubEncode2 } = await import("nostr-tools/nip19");
+        await plugin.nvim.outWrite("Fetching messages from relays...\n\n");
+        const messages = await receiveMessages2(
+          config.privateKey,
+          config.relays,
+          20
+        );
+        if (messages.length === 0) {
+          await plugin.nvim.outWrite("No messages found.\n");
+          return;
+        }
+        await plugin.nvim.outWrite(`Found ${messages.length} message(s):
+
+`);
+        for (const msg of messages) {
+          const fromNpub = npubEncode2(msg.from);
+          const timestamp = formatTimestamp2(msg.created_at);
+          await plugin.nvim.outWrite(
+            `From: ${fromNpub}
+Time: ${timestamp}
+Message: ${msg.content}
+${"=".repeat(60)}
+
+`
+          );
+        }
+      } catch (error) {
+        await plugin.nvim.errWrite(`Error checking messages: ${error}
 `);
       }
     },
