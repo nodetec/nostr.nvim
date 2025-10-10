@@ -1,9 +1,8 @@
-import { SimplePool } from 'nostr-tools/pool';
-import * as nip17 from 'nostr-tools/nip17';
-import { hexToBytes } from '@noble/hashes/utils';
-import { decode } from 'nostr-tools/nip19';
-import { getPublicKey } from 'nostr-tools/pure';
-import type { NostrEvent } from 'nostr-tools/core';
+import { SimplePool } from "nostr-tools/pool";
+import * as nip17 from "nostr-tools/nip17";
+import { hexToBytes } from "@noble/hashes/utils";
+import { decode } from "nostr-tools/nip19";
+import { getPublicKey } from "nostr-tools/pure";
 
 export interface Message {
   id: string;
@@ -16,7 +15,7 @@ export async function sendMessage(
   privateKeyHex: string,
   recipientPubkey: string,
   message: string,
-  relays: string[]
+  relays: string[],
 ): Promise<void> {
   const pool = new SimplePool();
 
@@ -27,21 +26,20 @@ export async function sendMessage(
     // Create wrapped DMs for both sender and recipient (NIP-17)
     const wrappedEvents = nip17.wrapManyEvents(
       privateKey,
-      [
-        { publicKey: recipientPubkey },
-        { publicKey: senderPubkey }
-      ],
-      message
+      [{ publicKey: recipientPubkey }, { publicKey: senderPubkey }],
+      message,
     );
 
     // Publish all wrapped events to relays
     for (const event of wrappedEvents) {
       const results = await Promise.allSettled(pool.publish(relays, event));
 
-      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
 
       if (succeeded === 0) {
-        throw new Error(`Failed to publish message to all ${relays.length} relay(s)`);
+        throw new Error(
+          `Failed to publish message to all ${relays.length} relay(s)`,
+        );
       }
     }
   } finally {
@@ -52,7 +50,7 @@ export async function sendMessage(
 export async function receiveMessages(
   privateKeyHex: string,
   relays: string[],
-  limit: number = 20
+  limit: number = 20,
 ): Promise<Message[]> {
   const pool = new SimplePool();
   const messages: Message[] = [];
@@ -64,7 +62,7 @@ export async function receiveMessages(
     // Subscribe to kind:1059 (gift wrapped events) addressed to us
     const events = await pool.querySync(relays, {
       kinds: [1059],
-      '#p': [publicKey],
+      "#p": [publicKey],
       limit,
     });
 
@@ -81,6 +79,7 @@ export async function receiveMessages(
         });
       } catch (error) {
         // Skip events we can't decrypt (not meant for us)
+        console.warn("Failed to unwrap event:", error);
         continue;
       }
     }
@@ -96,17 +95,17 @@ export async function receiveMessages(
 
 export function parseRecipient(input: string): string {
   // If it starts with npub, decode it
-  if (input.startsWith('npub')) {
+  if (input.startsWith("npub")) {
     const decoded = decode(input);
-    if (decoded.type === 'npub') {
+    if (decoded.type === "npub") {
       return decoded.data;
     }
-    throw new Error('Invalid npub');
+    throw new Error("Invalid npub");
   }
 
   // Otherwise assume it's hex
   if (!/^[0-9a-f]{64}$/i.test(input)) {
-    throw new Error('Invalid public key format. Use npub or hex.');
+    throw new Error("Invalid public key format. Use npub or hex.");
   }
 
   return input.toLowerCase();
