@@ -1,7 +1,7 @@
-import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
-import { nsecEncode, npubEncode, decode } from 'nostr-tools/nip19';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
-import type { NostrKeys } from '../types/index.js';
+import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { nsecEncode, npubEncode, decode } from "nostr-tools/nip19";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
+import type { NostrKeys } from "../types/index.js";
 
 export function generateKeys(): NostrKeys {
   const privateKeyBytes = generateSecretKey();
@@ -20,8 +20,8 @@ export function importNsec(nsec: string): NostrKeys {
   try {
     const decoded = decode(nsec);
 
-    if (decoded.type !== 'nsec') {
-      throw new Error('Invalid nsec key');
+    if (decoded.type !== "nsec") {
+      throw new Error("Invalid nsec key");
     }
 
     const privateKeyBytes = decoded.data;

@@ -1,7 +1,13 @@
+export interface RelayConfig {
+  url: string;
+  read: boolean;
+  write: boolean;
+}
+
 export interface NostrConfig {
   privateKey?: string; // hex format
   publicKey?: string; // hex format
-  relays?: string[];
+  relays?: RelayConfig[] | string[]; // Support both old and new format
 }
 
 export interface NostrKeys {

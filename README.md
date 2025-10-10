@@ -195,14 +195,42 @@ Configuration is stored in `~/.config/nostr.nvim/config.json`:
   "privateKey": "hex-format-private-key",
   "publicKey": "hex-format-public-key",
   "relays": [
-    "wss://relay.damus.io",
-    "wss://nos.lol"
+    { "url": "wss://relay.damus.io", "read": true, "write": true },
+    { "url": "wss://relay.notebin.io", "read": true, "write": true }
   ]
 }
 ```
 
+### Relay Configuration
+
+Each relay can be configured for reading, writing, or both:
+
+**Read + Write (default):**
+```json
+{ "url": "wss://relay.damus.io", "read": true, "write": true }
+```
+
+**Read-only** (great for following content from popular relays):
+```json
+{ "url": "wss://relay.nostr.band", "read": true, "write": false }
+```
+
+**Write-only** (good for paid or personal relays):
+```json
+{ "url": "wss://my-paid-relay.com", "read": false, "write": true }
+```
+
+**Backward Compatibility:**
+The old string array format is still supported and will be automatically migrated:
+```json
+{
+  "relays": ["wss://relay.damus.io", "wss://nos.lol"]
+}
+```
+Strings are converted to relays with both read and write enabled.
+
 You can manually edit this file to:
-- Add multiple relays
+- Add multiple relays with different read/write permissions
 - Change keys
 - Configure other settings
 
@@ -237,17 +265,24 @@ You can manually edit this file to:
 
 ### Multi-Relay Setup
 
-Edit `~/.config/nostr.nvim/config.json` to add more relays:
+Edit `~/.config/nostr.nvim/config.json` to configure multiple relays with different permissions:
+
 ```json
 {
   "relays": [
-    "wss://relay.damus.io",
-    "wss://relay.notebin.io",
+    { "url": "wss://relay.damus.io", "read": true, "write": true },
+    { "url": "wss://relay.notebin.io", "read": true, "write": true },
+    { "url": "wss://relay.nostr.band", "read": true, "write": false },
+    { "url": "wss://my-paid-relay.com", "read": false, "write": true }
   ]
 }
 ```
 
-The plugin will attempt to publish to all configured relays.
+**How it works:**
+- **Write operations** (posting notes, snippets, articles, DMs) use relays with `write: true`
+- **Read operations** (checking DMs, fetching notes) use relays with `read: true`
+- The plugin attempts to publish to all write-enabled relays simultaneously
+- The plugin queries all read-enabled relays for fetching content
 
 ## Troubleshooting
 

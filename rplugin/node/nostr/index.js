@@ -11,14 +11,51 @@ import { join } from "path";
 import { homedir } from "os";
 var CONFIG_DIR = join(homedir(), ".config", "nostr.nvim");
 var CONFIG_FILE = join(CONFIG_DIR, "config.json");
+function migrateRelayConfig(config) {
+  if (!config.relays || config.relays.length === 0) {
+    return config;
+  }
+  if (typeof config.relays[0] === "object" && "url" in config.relays[0]) {
+    return config;
+  }
+  const migratedRelays = config.relays.map((url) => ({
+    url,
+    read: true,
+    write: true
+  }));
+  return {
+    ...config,
+    relays: migratedRelays
+  };
+}
+function getReadRelays(config) {
+  if (!config.relays || config.relays.length === 0) {
+    return [];
+  }
+  if (typeof config.relays[0] === "string") {
+    return config.relays;
+  }
+  return config.relays.filter((r) => r.read).map((r) => r.url);
+}
+function getWriteRelays(config) {
+  if (!config.relays || config.relays.length === 0) {
+    return [];
+  }
+  if (typeof config.relays[0] === "string") {
+    return config.relays;
+  }
+  return config.relays.filter((r) => r.write).map((r) => r.url);
+}
 async function loadConfig() {
   try {
     if (!existsSync(CONFIG_FILE)) {
       return {};
     }
     const data = await readFile(CONFIG_FILE, "utf-8");
-    return JSON.parse(data);
+    const config = JSON.parse(data);
+    return migrateRelayConfig(config);
   } catch (error) {
+    console.error(`Failed to load config: ${error}`);
     return {};
   }
 }
@@ -40,7 +77,10 @@ function index_default(plugin) {
     async () => {
       try {
         const keys = generateKeys();
-        const defaultRelays = ["wss://relay.damus.io"];
+        const defaultRelays = [
+          { url: "wss://relay.damus.io", read: true, write: true },
+          { url: "wss://relay.notebin.io", read: true, write: true }
+        ];
         const config = await loadConfig();
         config.privateKey = keys.privateKey;
         config.publicKey = keys.publicKey;
@@ -53,7 +93,7 @@ Public Key (npub): ${keys.npub}
 Keep your nsec private: ${keys.nsec}
 
 Relays:
-` + defaultRelays.map((r) => `  - ${r}`).join("\n") + `
+` + defaultRelays.map((r) => `  - ${r.url}`).join("\n") + `
 
 Configuration saved to ~/.config/nostr.nvim/config.json
 `
@@ -175,14 +215,17 @@ Hex: ${keys.publicKey}
     async () => {
       try {
         const config = await loadConfig();
-        const defaultRelays = ["wss://relay.damus.io"];
+        const defaultRelays = [
+          { url: "wss://relay.damus.io", read: true, write: true },
+          { url: "wss://relay.notebin.io", read: true, write: true }
+        ];
         config.relays = defaultRelays;
         await saveConfig(config);
         await plugin.nvim.outWrite(
           `Default relay configured!
 
 Relays:
-` + defaultRelays.map((r) => `  - ${r}`).join("\n") + `
+` + defaultRelays.map((r) => `  - ${r.url}`).join("\n") + `
 
 Relay configuration saved to ~/.config/nostr.nvim/config.json
 `
@@ -211,13 +254,14 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
-        const { parseRecipient, sendMessage } = await import("./message-XZ5XYPE2.js");
+        const { parseRecipient, sendMessage } = await import("./message-VLX55HFO.js");
         const recipientInput = args[0];
         const message = args.slice(1).join(" ");
         const recipientPubkey = parseRecipient(recipientInput);
@@ -226,7 +270,7 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           config.privateKey,
           recipientPubkey,
           message,
-          config.relays
+          writeRelays
         );
         await plugin.nvim.outWrite("Message sent successfully!\n");
       } catch (error) {
@@ -247,18 +291,19 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const readRelays = getReadRelays(config);
+        if (readRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No read relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
-        const { receiveMessages, formatTimestamp } = await import("./message-XZ5XYPE2.js");
+        const { receiveMessages, formatTimestamp } = await import("./message-VLX55HFO.js");
         const { npubEncode } = await import("nostr-tools/nip19");
         await plugin.nvim.outWrite("Fetching messages from relays...\n");
         const messages = await receiveMessages(
           config.privateKey,
-          config.relays,
+          readRelays,
           20
         );
         if (messages.length === 0) {
@@ -350,9 +395,10 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
@@ -362,7 +408,7 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
         const eventId = await postNote(
           config.privateKey,
           content,
-          config.relays
+          writeRelays
         );
         await plugin.nvim.outWrite(
           `Note published successfully!
@@ -387,9 +433,10 @@ Event ID: ${eventId}
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
@@ -412,7 +459,7 @@ Event ID: ${eventId}
         const eventId = await postNote(
           config.privateKey,
           content,
-          config.relays
+          writeRelays
         );
         await plugin.nvim.outWrite(
           `Note published successfully!
@@ -437,9 +484,10 @@ Event ID: ${eventId}
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
@@ -502,7 +550,7 @@ Event ID: ${eventId}
             extension,
             description: description || void 0
           },
-          config.relays
+          writeRelays
         );
         await plugin.nvim.outWrite(
           `Code snippet published successfully!
@@ -527,9 +575,10 @@ Event ID: ${eventId}
           );
           return;
         }
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
@@ -615,7 +664,7 @@ Event ID: ${eventId}
             image,
             topics
           },
-          config.relays
+          writeRelays
         );
         await plugin.nvim.outWrite(
           `Article published successfully!
@@ -753,9 +802,10 @@ Event ID: ${eventId}
           return;
         }
         const config = await loadConfig();
-        if (!config.relays || config.relays.length === 0) {
+        const readRelays = getReadRelays(config);
+        if (readRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
+            "No read relays configured. Run :NostrInit or :NostrSetupRelay first.\n"
           );
           return;
         }
@@ -764,7 +814,7 @@ Event ID: ${eventId}
         const pubkeyInput = args[0];
         const pubkey = parsePubkey(pubkeyInput);
         await plugin.nvim.outWrite("Fetching notes from relays...\n");
-        const notes = await getNotesForPubkey(pubkey, config.relays, 20);
+        const notes = await getNotesForPubkey(pubkey, readRelays, 20);
         if (notes.length === 0) {
           await plugin.nvim.outWrite("No notes found for this user.\n");
           return;

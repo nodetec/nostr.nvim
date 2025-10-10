@@ -1,8 +1,7 @@
-import { SimplePool } from 'nostr-tools/pool';
-import { finalizeEvent } from 'nostr-tools/pure';
-import { hexToBytes } from '@noble/hashes/utils';
-import { decode } from 'nostr-tools/nip19';
-import type { NostrEvent } from 'nostr-tools/core';
+import { SimplePool } from "nostr-tools/pool";
+import { finalizeEvent } from "nostr-tools/pure";
+import { hexToBytes } from "@noble/hashes/utils";
+import { decode } from "nostr-tools/nip19";
 
 export interface Note {
   id: string;
@@ -14,7 +13,7 @@ export interface Note {
 export async function postNote(
   privateKeyHex: string,
   content: string,
-  relays: string[]
+  relays: string[],
 ): Promise<string> {
   const pool = new SimplePool();
 
@@ -29,15 +28,14 @@ export async function postNote(
         tags: [],
         content,
       },
-      privateKey
+      privateKey,
     );
 
     // Publish to all relays
     const results = await Promise.allSettled(pool.publish(relays, event));
 
     // Check if at least one relay succeeded
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
 
     if (succeeded === 0) {
       throw new Error(`Failed to publish to all ${relays.length} relay(s)`);
@@ -52,7 +50,7 @@ export async function postNote(
 export async function getNotesForPubkey(
   pubkey: string,
   relays: string[],
-  limit: number = 20
+  limit: number = 20,
 ): Promise<Note[]> {
   const pool = new SimplePool();
   const notes: Note[] = [];
@@ -86,17 +84,17 @@ export async function getNotesForPubkey(
 
 export function parsePubkey(input: string): string {
   // If it starts with npub, decode it
-  if (input.startsWith('npub')) {
+  if (input.startsWith("npub")) {
     const decoded = decode(input);
-    if (decoded.type === 'npub') {
+    if (decoded.type === "npub") {
       return decoded.data;
     }
-    throw new Error('Invalid npub');
+    throw new Error("Invalid npub");
   }
 
   // Otherwise assume it's hex
   if (!/^[0-9a-f]{64}$/i.test(input)) {
-    throw new Error('Invalid public key format. Use npub or hex.');
+    throw new Error("Invalid public key format. Use npub or hex.");
   }
 
   return input.toLowerCase();

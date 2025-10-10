@@ -14,17 +14,16 @@ async function sendMessage(privateKeyHex, recipientPubkey, message, relays) {
     const senderPubkey = getPublicKey(privateKey);
     const wrappedEvents = nip17.wrapManyEvents(
       privateKey,
-      [
-        { publicKey: recipientPubkey },
-        { publicKey: senderPubkey }
-      ],
+      [{ publicKey: recipientPubkey }, { publicKey: senderPubkey }],
       message
     );
     for (const event of wrappedEvents) {
       const results = await Promise.allSettled(pool.publish(relays, event));
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       if (succeeded === 0) {
-        throw new Error(`Failed to publish message to all ${relays.length} relay(s)`);
+        throw new Error(
+          `Failed to publish message to all ${relays.length} relay(s)`
+        );
       }
     }
   } finally {
@@ -52,6 +51,7 @@ async function receiveMessages(privateKeyHex, relays, limit = 20) {
           created_at: rumor.created_at
         });
       } catch (error) {
+        console.warn("Failed to unwrap event:", error);
         continue;
       }
     }

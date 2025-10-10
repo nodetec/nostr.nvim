@@ -1,6 +1,11 @@
 import { NvimPlugin } from "neovim";
 import { generateKeys, importNsec } from "./lib/keys.js";
-import { loadConfig, saveConfig } from "./lib/config.js";
+import {
+  loadConfig,
+  saveConfig,
+  getReadRelays,
+  getWriteRelays,
+} from "./lib/config.js";
 
 export default function (plugin: NvimPlugin) {
   plugin.registerCommand(
@@ -8,7 +13,10 @@ export default function (plugin: NvimPlugin) {
     async () => {
       try {
         const keys = generateKeys();
-        const defaultRelays = ["wss://relay.damus.io"];
+        const defaultRelays = [
+          { url: "wss://relay.damus.io", read: true, write: true },
+          { url: "wss://relay.notebin.io", read: true, write: true },
+        ];
 
         const config = await loadConfig();
         config.privateKey = keys.privateKey;
@@ -21,7 +29,7 @@ export default function (plugin: NvimPlugin) {
             `Public Key (npub): ${keys.npub}\n` +
             `Keep your nsec private: ${keys.nsec}\n\n` +
             `Relays:\n` +
-            defaultRelays.map((r) => `  - ${r}`).join("\n") +
+            defaultRelays.map((r) => `  - ${r.url}`).join("\n") +
             `\n\nConfiguration saved to ~/.config/nostr.nvim/config.json\n`,
         );
       } catch (error) {
@@ -144,14 +152,17 @@ export default function (plugin: NvimPlugin) {
       try {
         const config = await loadConfig();
 
-        const defaultRelays = ["wss://relay.damus.io"];
+        const defaultRelays = [
+          { url: "wss://relay.damus.io", read: true, write: true },
+          { url: "wss://relay.notebin.io", read: true, write: true },
+        ];
         config.relays = defaultRelays;
         await saveConfig(config);
 
         await plugin.nvim.outWrite(
           `Default relay configured!\n\n` +
             `Relays:\n` +
-            defaultRelays.map((r) => `  - ${r}`).join("\n") +
+            defaultRelays.map((r) => `  - ${r.url}`).join("\n") +
             `\n\nRelay configuration saved to ~/.config/nostr.nvim/config.json\n`,
         );
       } catch (error) {
@@ -182,9 +193,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -203,7 +215,7 @@ export default function (plugin: NvimPlugin) {
           config.privateKey,
           recipientPubkey,
           message,
-          config.relays,
+          writeRelays,
         );
 
         await plugin.nvim.outWrite("Message sent successfully!\n");
@@ -227,9 +239,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const readRelays = getReadRelays(config);
+        if (readRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No read relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -243,7 +256,7 @@ export default function (plugin: NvimPlugin) {
 
         const messages = await receiveMessages(
           config.privateKey,
-          config.relays,
+          readRelays,
           20,
         );
 
@@ -281,8 +294,8 @@ export default function (plugin: NvimPlugin) {
 
         // Create a new buffer
         const bufResult = await plugin.nvim.createBuffer(false, true);
-        if (typeof bufResult === 'number') {
-          throw new Error('Failed to create buffer');
+        if (typeof bufResult === "number") {
+          throw new Error("Failed to create buffer");
         }
         const buf = bufResult;
         const bufnr = buf.id;
@@ -316,8 +329,8 @@ export default function (plugin: NvimPlugin) {
           border: "rounded",
         });
 
-        if (typeof winResult === 'number') {
-          throw new Error('Failed to open window');
+        if (typeof winResult === "number") {
+          throw new Error("Failed to open window");
         }
         const win = winResult;
 
@@ -364,9 +377,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -376,11 +390,7 @@ export default function (plugin: NvimPlugin) {
 
         await plugin.nvim.outWrite("Publishing note to Nostr...\n");
 
-        const eventId = await postNote(
-          config.privateKey,
-          content,
-          config.relays,
-        );
+        const eventId = await postNote(config.privateKey, content, writeRelays);
 
         await plugin.nvim.outWrite(
           `Note published successfully!\n` + `Event ID: ${eventId}\n`,
@@ -405,9 +415,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -436,11 +447,7 @@ export default function (plugin: NvimPlugin) {
 
         await plugin.nvim.outWrite("\nPublishing note to Nostr...\n");
 
-        const eventId = await postNote(
-          config.privateKey,
-          content,
-          config.relays,
-        );
+        const eventId = await postNote(config.privateKey, content, writeRelays);
 
         await plugin.nvim.outWrite(
           `Note published successfully!\n` + `Event ID: ${eventId}\n`,
@@ -465,9 +472,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -489,11 +497,8 @@ export default function (plugin: NvimPlugin) {
           "&filetype",
         ])) as string;
 
-        const {
-          postSnippet,
-          getFileExtension,
-          detectLanguageFromExtension,
-        } = await import("./lib/snippet.js");
+        const { postSnippet, getFileExtension, detectLanguageFromExtension } =
+          await import("./lib/snippet.js");
 
         // Determine language and extension
         let language = filetype || undefined;
@@ -544,7 +549,7 @@ export default function (plugin: NvimPlugin) {
             extension,
             description: description || undefined,
           },
-          config.relays,
+          writeRelays,
         );
 
         await plugin.nvim.outWrite(
@@ -570,9 +575,10 @@ export default function (plugin: NvimPlugin) {
           return;
         }
 
-        if (!config.relays || config.relays.length === 0) {
+        const writeRelays = getWriteRelays(config);
+        if (writeRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No write relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -622,7 +628,9 @@ export default function (plugin: NvimPlugin) {
         }
 
         // Use the content with title stripped if it was extracted
-        const finalMarkdown = markdownTitle ? markdownContent : markdownWithPossibleTitle;
+        const finalMarkdown = markdownTitle
+          ? markdownContent
+          : markdownWithPossibleTitle;
 
         // Get summary (from frontmatter or prompt)
         let summary = frontmatter.summary as string | undefined;
@@ -646,9 +654,7 @@ export default function (plugin: NvimPlugin) {
 
         // Generate identifier
         const identifier =
-          frontmatter.identifier ||
-          frontmatter.id ||
-          generateIdentifier(title);
+          frontmatter.identifier || frontmatter.id || generateIdentifier(title);
 
         // Get image URL if present
         const image = frontmatter.image as string | undefined;
@@ -685,7 +691,7 @@ export default function (plugin: NvimPlugin) {
             image,
             topics,
           },
-          config.relays,
+          writeRelays,
         );
 
         await plugin.nvim.outWrite(
@@ -720,7 +726,7 @@ export default function (plugin: NvimPlugin) {
 
               // Add other fields from existing frontmatter
               for (const [key, value] of Object.entries(currentFm)) {
-                if (key === 'identifier') continue; // Skip, already added
+                if (key === "identifier") continue; // Skip, already added
                 if (Array.isArray(value)) {
                   fmLines.push(`${key}: ${value.join(", ")}`);
                 } else {
@@ -872,9 +878,10 @@ export default function (plugin: NvimPlugin) {
 
         const config = await loadConfig();
 
-        if (!config.relays || config.relays.length === 0) {
+        const readRelays = getReadRelays(config);
+        if (readRelays.length === 0) {
           await plugin.nvim.errWrite(
-            "No relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
+            "No read relays configured. Run :NostrInit or :NostrSetupRelay first.\n",
           );
           return;
         }
@@ -888,7 +895,7 @@ export default function (plugin: NvimPlugin) {
 
         await plugin.nvim.outWrite("Fetching notes from relays...\n");
 
-        const notes = await getNotesForPubkey(pubkey, config.relays, 20);
+        const notes = await getNotesForPubkey(pubkey, readRelays, 20);
 
         if (notes.length === 0) {
           await plugin.nvim.outWrite("No notes found for this user.\n");
@@ -924,8 +931,8 @@ export default function (plugin: NvimPlugin) {
 
         // Create a new buffer
         const bufResult = await plugin.nvim.createBuffer(false, true);
-        if (typeof bufResult === 'number') {
-          throw new Error('Failed to create buffer');
+        if (typeof bufResult === "number") {
+          throw new Error("Failed to create buffer");
         }
         const buf = bufResult;
         const bufnr = buf.id;
@@ -958,8 +965,8 @@ export default function (plugin: NvimPlugin) {
           border: "rounded",
         });
 
-        if (typeof winResult === 'number') {
-          throw new Error('Failed to open window');
+        if (typeof winResult === "number") {
+          throw new Error("Failed to open window");
         }
         const win = winResult;
 
