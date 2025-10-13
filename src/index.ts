@@ -522,12 +522,24 @@ export default function (plugin: NvimPlugin) {
           "Description (optional): ",
         ])) as string;
 
+        // Prompt for tags
+        const tagsInput = (await plugin.nvim.call("input", [
+          "Tags (comma-separated, optional): ",
+        ])) as string;
+
+        let tags: string[] | undefined;
+        if (tagsInput && tagsInput.trim() !== "") {
+          tags = tagsInput.split(",").map((t) => t.trim());
+        }
+
         // Show confirmation with snippet details
         let confirmMsg = `Post code snippet to Nostr (NIP-C0)?\n`;
         if (name) confirmMsg += `Name: ${name}\n`;
         if (language) confirmMsg += `Language: ${language}\n`;
         if (extension) confirmMsg += `Extension: ${extension}\n`;
         if (description) confirmMsg += `Description: ${description}\n`;
+        if (tags && tags.length > 0)
+          confirmMsg += `Tags: ${tags.join(", ")}\n`;
         confirmMsg += `Lines: ${lines.length}\n`;
         confirmMsg += `Confirm (y/n): `;
 
@@ -548,6 +560,7 @@ export default function (plugin: NvimPlugin) {
             name,
             extension,
             description: description || undefined,
+            tags,
           },
           writeRelays,
         );

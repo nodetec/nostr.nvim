@@ -36,6 +36,11 @@ async function postSnippet(privateKeyHex, content, options, relays) {
     if (options.repo) {
       tags.push(["repo", options.repo]);
     }
+    if (options.tags) {
+      for (const tag of options.tags) {
+        tags.push(["t", tag.toLowerCase()]);
+      }
+    }
     const event = finalizeEvent(
       {
         kind: 1337,

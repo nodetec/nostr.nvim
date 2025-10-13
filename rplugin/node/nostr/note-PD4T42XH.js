@@ -21,7 +21,6 @@ async function postNote(privateKeyHex, content, relays) {
     );
     const results = await Promise.allSettled(pool.publish(relays, event));
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.filter((r) => r.status === "rejected").length;
     if (succeeded === 0) {
       throw new Error(`Failed to publish to all ${relays.length} relay(s)`);
     }

@@ -11,6 +11,7 @@ export interface SnippetOptions {
   license?: string;
   dependencies?: string[];
   repo?: string;
+  tags?: string[];
 }
 
 export async function postSnippet(
@@ -59,6 +60,12 @@ export async function postSnippet(
 
     if (options.repo) {
       tags.push(["repo", options.repo]);
+    }
+
+    if (options.tags) {
+      for (const tag of options.tags) {
+        tags.push(["t", tag.toLowerCase()]);
+      }
     }
 
     // Create kind:1337 code snippet event (NIP-C0)

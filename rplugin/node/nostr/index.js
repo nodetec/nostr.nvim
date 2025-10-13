@@ -18,11 +18,13 @@ function migrateRelayConfig(config) {
   if (typeof config.relays[0] === "object" && "url" in config.relays[0]) {
     return config;
   }
-  const migratedRelays = config.relays.map((url) => ({
-    url,
-    read: true,
-    write: true
-  }));
+  const migratedRelays = config.relays.map(
+    (url) => ({
+      url,
+      read: true,
+      write: true
+    })
+  );
   return {
     ...config,
     relays: migratedRelays
@@ -402,14 +404,10 @@ Relay configuration saved to ~/.config/nostr.nvim/config.json
           );
           return;
         }
-        const { postNote } = await import("./note-4MVTJQXZ.js");
+        const { postNote } = await import("./note-PD4T42XH.js");
         const content = args.join(" ");
         await plugin.nvim.outWrite("Publishing note to Nostr...\n");
-        const eventId = await postNote(
-          config.privateKey,
-          content,
-          writeRelays
-        );
+        const eventId = await postNote(config.privateKey, content, writeRelays);
         await plugin.nvim.outWrite(
           `Note published successfully!
 Event ID: ${eventId}
@@ -454,13 +452,9 @@ Event ID: ${eventId}
           await plugin.nvim.outWrite("Post cancelled.\n");
           return;
         }
-        const { postNote } = await import("./note-4MVTJQXZ.js");
+        const { postNote } = await import("./note-PD4T42XH.js");
         await plugin.nvim.outWrite("\nPublishing note to Nostr...\n");
-        const eventId = await postNote(
-          config.privateKey,
-          content,
-          writeRelays
-        );
+        const eventId = await postNote(config.privateKey, content, writeRelays);
         await plugin.nvim.outWrite(
           `Note published successfully!
 Event ID: ${eventId}
@@ -503,11 +497,7 @@ Event ID: ${eventId}
           buffer.id,
           "&filetype"
         ]);
-        const {
-          postSnippet,
-          getFileExtension,
-          detectLanguageFromExtension
-        } = await import("./snippet-3PPPS57K.js");
+        const { postSnippet, getFileExtension, detectLanguageFromExtension } = await import("./snippet-QYGUAR2H.js");
         let language = filetype || void 0;
         let extension;
         let name;
@@ -522,6 +512,13 @@ Event ID: ${eventId}
         const description = await plugin.nvim.call("input", [
           "Description (optional): "
         ]);
+        const tagsInput = await plugin.nvim.call("input", [
+          "Tags (comma-separated, optional): "
+        ]);
+        let tags;
+        if (tagsInput && tagsInput.trim() !== "") {
+          tags = tagsInput.split(",").map((t) => t.trim());
+        }
         let confirmMsg = `Post code snippet to Nostr (NIP-C0)?
 `;
         if (name) confirmMsg += `Name: ${name}
@@ -531,6 +528,9 @@ Event ID: ${eventId}
         if (extension) confirmMsg += `Extension: ${extension}
 `;
         if (description) confirmMsg += `Description: ${description}
+`;
+        if (tags && tags.length > 0)
+          confirmMsg += `Tags: ${tags.join(", ")}
 `;
         confirmMsg += `Lines: ${lines.length}
 `;
@@ -548,7 +548,8 @@ Event ID: ${eventId}
             language,
             name,
             extension,
-            description: description || void 0
+            description: description || void 0,
+            tags
           },
           writeRelays
         );
@@ -809,7 +810,7 @@ Event ID: ${eventId}
           );
           return;
         }
-        const { getNotesForPubkey, parsePubkey, formatTimestamp } = await import("./note-4MVTJQXZ.js");
+        const { getNotesForPubkey, parsePubkey, formatTimestamp } = await import("./note-PD4T42XH.js");
         const { npubEncode } = await import("nostr-tools/nip19");
         const pubkeyInput = args[0];
         const pubkey = parsePubkey(pubkeyInput);
