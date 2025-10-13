@@ -1,74 +1,69 @@
-M = {}
+local M = {}
 
-function M.setup()
-	-- print("Nostr setup")
-	-- vim.fn["NostrSetup"]()
-	-- print("Nostr setup done")
+-- Initialize Nostr config (generate keys + setup default relay)
+function M.init()
+	vim.cmd("NostrInit")
 end
 
-function M.config()
-	print("Nostr config")
-	vim.fn["NostrSetup"]()
-	print("Nostr config done")
+-- Generate new Nostr keypair
+function M.generate_keys()
+	vim.cmd("NostrGenerateKeys")
 end
 
-function M.open_menu()
-	-- Define the menu items
-	local items = {
-		"Option 1",
-		"Option 2",
-		"Option 3",
-		"Quit",
-	}
+-- Import existing nsec key
+function M.import_key(nsec)
+	if nsec then
+		vim.cmd("NostrImportKey " .. nsec)
+	else
+		vim.cmd("NostrImportKey")
+	end
+end
 
-	-- Create a buffer for the menu
-	local buf = vim.api.nvim_create_buf(false, true)
+-- Show public key
+function M.show_pubkey()
+	vim.cmd("NostrShowPubkey")
+end
 
-	-- Set the buffer lines to the menu items
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, items)
+-- Get npub (print just the npub value)
+function M.get_npub()
+	vim.cmd("NostrGetNpub")
+end
 
-	-- Get the current editor dimensions
-	local width = vim.opt.columns:get()
-	local height = vim.opt.lines:get()
+-- Set up default relay (Damus)
+function M.setup_relay()
+	vim.cmd("NostrSetupRelay")
+end
 
-	-- Define the window dimensions and position
-	local win_width = math.ceil(width * 0.4)
-	local win_height = #items + 2
-	local row = math.ceil((height - win_height) / 2)
-	local col = math.ceil((width - win_width) / 2)
+-- Send encrypted direct message (NIP-17)
+function M.send_dm(recipient, message)
+	if recipient and message then
+		vim.cmd("NostrSendDM " .. recipient .. " " .. message)
+	else
+		vim.cmd("NostrSendDM")
+	end
+end
 
-	-- Create a floating window for the menu
-	local win = vim.api.nvim_open_win(buf, true, {
-		relative = "editor",
-		width = win_width,
-		height = win_height,
-		row = row,
-		col = col,
-		style = "minimal",
-		border = "rounded",
-	})
+-- Check incoming direct messages
+function M.check_dms()
+	vim.cmd("NostrCheckDMs")
+end
 
-	-- Set some options for the buffer and window
-	vim.bo[buf].modifiable = false
-	vim.bo[buf].bufhidden = "wipe"
-	vim.wo[win].cursorline = true
+-- Post a public note (kind 1)
+function M.post_note(message)
+	if message then
+		vim.cmd("NostrPostNote " .. message)
+	else
+		vim.cmd("NostrPostNote")
+	end
+end
 
-  -- Set key mappings for the menu
-	vim.keymap.set("n", "j", function()
-		require("nostr.lib.keys").handle_key("j", win, items)
-	end, { buffer = buf })
-
-	vim.keymap.set("n", "k", function()
-		require("nostr.lib.keys").handle_key("k", win, items)
-	end, { buffer = buf })
-
-	vim.keymap.set("n", "<CR>", function()
-		require("nostr.lib.keys").handle_key("<CR>", win, items)
-	end, { buffer = buf })
-
-	vim.keymap.set("n", "<ESC>", function()
-		require("nostr.lib.keys").handle_key("<ESC>", win, items)
-	end, { buffer = buf })
+-- Get notes for an npub
+function M.get_notes(npub)
+	if npub then
+		vim.cmd("NostrGetNotes " .. npub)
+	else
+		vim.cmd("NostrGetNotes")
+	end
 end
 
 return M
